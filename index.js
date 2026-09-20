@@ -6,10 +6,6 @@ const songsDir = path.join(__dirname, 'songs');
 
 const songs = fs.readdirSync(songsDir).filter((file) => file.endsWith('.mp3'));
 
-songs.forEach((song, index) => {
-	console.log(`${index + 1}. ${song}`);
-});
-
 let selectedIndex = 0;
 
 function interfaceRender() {
@@ -26,6 +22,37 @@ function interfaceRender() {
 }
 
 interfaceRender();
+
+let player = null;
+let isPaused = false;
+
+function play(songPath) {
+	if (player) {
+		player.kill('SIGTERM');
+	}
+
+	player = spawn('afplay', [songPath]);
+	isPaused = false;
+
+	player.on('close', () => {
+		console.log('Finished playing.');
+
+		player = null;
+		isPaused = false;
+	});
+}
+
+function togglePause() {
+	if (!player) return;
+
+	if (isPaused) {
+		player.kill('SIGCONT');
+		isPaused = false;
+	} else {
+		player.kill('SIGSTOP');
+		isPaused = true;
+	}
+}
 
 process.stdin.setRawMode(true);
 process.stdin.resume();
@@ -51,7 +78,6 @@ process.stdin.on('data', (key) => {
 
 		interfaceRender();
 	} else if (key === '\r') {
-		// Enter
 		console.clear();
 
 		const selectedSong = songs[selectedIndex];
@@ -59,16 +85,31 @@ process.stdin.on('data', (key) => {
 
 		console.log(`Playing: ${selectedSong}`);
 
-		const player = spawn('afplay', [songPath]);
+		play(songPath);
+	} else if (key === 'p') {
+		// Pause / Resume
 
-		player.on('close', () => {
-			console.log('Finished playing.');
-		});
+		if (!player) {
+			return;
+		}
 
-		process.stdin.setRawMode(false);
-		process.stdin.pause();
+		if (isPaused) {
+			player.kill('SIGCONT');
+			isPaused = false;
+			console.log('Resumed');
+		} else {
+			player.kill('SIGSTOP');
+			isPaused = true;
+			console.log('Paused');
+		}
 	} else if (key === '\u0003') {
 		// Ctrl + C
+
+		if (player) {
+			player.kill('SIGCONT');
+			player.kill('SIGTERM');
+		}
+
 		process.stdin.setRawMode(false);
 		process.stdin.pause();
 		process.exit();
