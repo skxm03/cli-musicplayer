@@ -39,6 +39,8 @@ function play(index) {
 
 		player = null;
 		isPaused = false;
+
+		nextSong();
 	});
 }
 
