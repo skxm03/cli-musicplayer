@@ -28,9 +28,15 @@ function play(index) {
 	console.clear();
 	console.log(`Playing: ${song}`);
 
-	player = spawn('afplay', [songPath]);
+	const newPlayer = spawn('afplay', [songPath]);
 
-	player.on('close', () => {
+	player = newPlayer;
+
+	newPlayer.on('close', () => {
+		if (player !== newPlayer) {
+			return;
+		}
+
 		player = null;
 		isPaused = false;
 	});
