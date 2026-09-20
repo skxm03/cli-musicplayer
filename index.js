@@ -7,36 +7,30 @@ const songsDir = path.join(__dirname, 'songs');
 const songs = fs.readdirSync(songsDir).filter((file) => file.endsWith('.mp3'));
 
 let selectedIndex = 0;
-
-function interfaceRender() {
-	console.clear();
-
-	console.log('Select a song:\n');
-
-	songs.forEach((song, index) => {
-		const prefix = index === selectedIndex ? '> ' : '  ';
-		console.log(`${prefix}${song}`);
-	});
-
-	console.log('Use arrow keys to select, Enter to play.');
-}
-
-interfaceRender();
+let currentIndex = -1;
 
 let player = null;
 let isPaused = false;
 
-function play(songPath) {
+function play(index) {
 	if (player) {
+		player.kill('SIGCONT');
 		player.kill('SIGTERM');
 	}
 
-	player = spawn('afplay', [songPath]);
+	const song = songs[index];
+	const songPath = path.join(songsDir, song);
+
+	currentIndex = index;
+	selectedIndex = index;
 	isPaused = false;
 
-	player.on('close', () => {
-		console.log('Finished playing.');
+	console.clear();
+	console.log(`Playing: ${song}`);
 
+	player = spawn('afplay', [songPath]);
+
+	player.on('close', () => {
 		player = null;
 		isPaused = false;
 	});
@@ -48,11 +42,52 @@ function togglePause() {
 	if (isPaused) {
 		player.kill('SIGCONT');
 		isPaused = false;
+		console.log('Resumed');
 	} else {
 		player.kill('SIGSTOP');
 		isPaused = true;
+		console.log('Paused');
 	}
 }
+
+function nextSong() {
+	if (songs.length === 0) return;
+
+	let nextIndex = currentIndex + 1;
+
+	if (nextIndex >= songs.length) {
+		nextIndex = 0;
+	}
+
+	play(nextIndex);
+}
+
+function previousSong() {
+	if (songs.length === 0) return;
+
+	let previousIndex = currentIndex - 1;
+
+	if (previousIndex < 0) {
+		previousIndex = songs.length - 1;
+	}
+
+	play(previousIndex);
+}
+
+function interfaceRender() {
+	console.clear();
+
+	console.log('Select a song:\n');
+
+	songs.forEach((song, index) => {
+		const prefix = index === selectedIndex ? '> ' : '  ';
+		console.log(`${prefix}${song}`);
+	});
+
+	console.log('\nUse ↑ ↓ to select, Enter to play.');
+}
+
+interfaceRender();
 
 process.stdin.setRawMode(true);
 process.stdin.resume();
@@ -60,7 +95,6 @@ process.stdin.setEncoding('utf8');
 
 process.stdin.on('data', (key) => {
 	if (key === '\u001b[A') {
-		// Arrow Up
 		selectedIndex--;
 
 		if (selectedIndex < 0) {
@@ -69,7 +103,6 @@ process.stdin.on('data', (key) => {
 
 		interfaceRender();
 	} else if (key === '\u001b[B') {
-		// Arrow Down
 		selectedIndex++;
 
 		if (selectedIndex >= songs.length) {
@@ -78,33 +111,14 @@ process.stdin.on('data', (key) => {
 
 		interfaceRender();
 	} else if (key === '\r') {
-		console.clear();
-
-		const selectedSong = songs[selectedIndex];
-		const songPath = path.join(songsDir, selectedSong);
-
-		console.log(`Playing: ${selectedSong}`);
-
-		play(songPath);
+		play(selectedIndex);
 	} else if (key === 'p') {
-		// Pause / Resume
-
-		if (!player) {
-			return;
-		}
-
-		if (isPaused) {
-			player.kill('SIGCONT');
-			isPaused = false;
-			console.log('Resumed');
-		} else {
-			player.kill('SIGSTOP');
-			isPaused = true;
-			console.log('Paused');
-		}
+		togglePause();
+	} else if (key === 'n') {
+		nextSong();
+	} else if (key === 'b') {
+		previousSong();
 	} else if (key === '\u0003') {
-		// Ctrl + C
-
 		if (player) {
 			player.kill('SIGCONT');
 			player.kill('SIGTERM');
